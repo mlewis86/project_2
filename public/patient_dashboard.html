@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Patient Dashboard</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      th, td {
+        padding: 10px;
+        border: 1px solid #ddd;
+      }
+      th {
+        background-color: #f4f4f4;
+      }
+      .form-group {
+        margin-bottom: 1em;
+      }
+      .success-message {
+        color: green;
+      }
+      .error-message {
+        color: red;
+      }
+      button {
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Welcome, Patient</h1>
+    <h2>Your Details</h2>
+    <div id="patient-details"></div>
+
+    <h2>Prescriptions and Visits</h2>
+    <table id="patient-data">
+      <thead>
+        <tr>
+          <th>Medication Name</th>
+          <th>Dosage</th>
+          <th>Visit Time</th>
+          <th>Reason for Visit</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Update Email</h2>
+    <form id="update-email-form">
+      <div class="form-group">
+        <label for="currentEmail">Current Email:</label>
+        <input type="email" id="currentEmail" name="currentEmail" readonly />
+      </div>
+      <div class="form-group">
+        <label for="newEmail">New Email:</label>
+        <input type="email" id="newEmail" name="newEmail" required />
+      </div>
+      <button type="submit">Update Email</button>
+    </form>
+    <p id="update-email-status"></p>
+
+    <h2>Update Address</h2>
+    <form id="update-address-form">
+      <div class="form-group">
+        <label for="currentAddress">Current Address:</label>
+        <input type="text" id="currentAddress" name="currentAddress" readonly />
+      </div>
+      <div class="form-group">
+        <label for="newAddress">New Address:</label>
+        <input type="text" id="newAddress" name="newAddress" required />
+      </div>
+      <button type="submit">Update Address</button>
+    </form>
+    <p id="update-address-status"></p>
+
+    <h2>Update Phone Number</h2>
+    <form id="update-phone-form">
+      <div class="form-group">
+        <label for="currentPhoneNumber">Current Phone Number:</label>
+        <input type="text" id="currentPhoneNumber" name="currentPhoneNumber" readonly />
+      </div>
+      <div class="form-group">
+        <label for="newPhoneNumber">New Phone Number:</label>
+        <input type="text" id="newPhoneNumber" name="newPhoneNumber" required />
+      </div>
+      <button type="submit">Update Phone Number</button>
+    </form>
+    <p id="update-phone-status"></p>
+
+    <button onclick="logout()">Logout</button>
+
+    <script>
+      async function fetchPatientData() {
+        const response = await fetch("/patient-data");
+        if (response.ok) {
+          const data = await response.json();
+          displayPatientData(data);
+        } else {
+          document.body.innerHTML = "<h1>Unable to fetch data. Please log in again.</h1>";
+        }
+      }
+
+      function displayPatientData(data) {
+  if (data.length > 0) {
+    const details = `
+      <p><strong>Name:</strong> ${data[0].first_name} ${data[0].last_name}</p>
+      <p><strong>Date of Birth:</strong> ${data[0].date_of_birth}</p>
+      <p><strong>Sex:</strong> ${data[0].sex}</p>
+      <p><strong>Address:</strong> ${data[0].address}</p>
+      <p><strong>Email:</strong> ${data[0].email}</p>
+      <p><strong>Phone Number:</strong> ${data[0].phone_number}</p>
+    `;
+    document.getElementById("patient-details").innerHTML = details;
+
+    document.getElementById("currentEmail").value = data[0].email;
+    document.getElementById("currentAddress").value = data[0].address;
+    document.getElementById("currentPhoneNumber").value = data[0].phone_number;
+
+    const tbody = document.getElementById("patient-data").querySelector("tbody");
+    data.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${row.medication_name || "N/A"}</td>
+        <td>${row.dosage || "N/A"}</td>
+        <td>${row.visit_time || "N/A"}</td>
+        <td>${row.reason_for_visit || "N/A"}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } else {
+    document.getElementById("patient-data").querySelector("tbody").innerHTML =
+      "<tr><td colspan='4'>No data available</td></tr>";
+  }
+}
+
+      async function updateEmail(event) {
+        event.preventDefault();
+        const newEmail = document.getElementById("newEmail").value;
+
+        try {
+          const response = await fetch("/update-email", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ newEmail })
+          });
+
+          if (response.ok) {
+            document.getElementById("update-email-status").textContent =
+              "Email updated successfully.";
+            document.getElementById("update-email-status").className = "success-message";
+            document.getElementById("currentEmail").value = newEmail; 
+          } else {
+            const error = await response.text();
+            document.getElementById("update-email-status").textContent = `Error: ${error}`;
+            document.getElementById("update-email-status").className = "error-message";
+          }
+        } catch (err) {
+          document.getElementById("update-email-status").textContent = "Failed to update email.";
+          document.getElementById("update-email-status").className = "error-message";
+        }
+      }
+
+      async function updateAddress(event) {
+        event.preventDefault();
+        const newAddress = document.getElementById("newAddress").value;
+
+        try {
+          const response = await fetch("/update-address", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ newAddress })
+          });
+
+          if (response.ok) {
+            document.getElementById("update-address-status").textContent =
+              "Address updated successfully.";
+            document.getElementById("update-address-status").className = "success-message";
+            document.getElementById("currentAddress").value = newAddress; 
+          } else {
+            const error = await response.text();
+            document.getElementById("update-address-status").textContent = `Error: ${error}`;
+            document.getElementById("update-address-status").className = "error-message";
+          }
+        } catch (err) {
+          document.getElementById("update-address-status").textContent =
+            "Failed to update address.";
+          document.getElementById("update-address-status").className = "error-message";
+        }
+      }
+
+      async function updatePhoneNumber(event) {
+        event.preventDefault();
+        const newPhoneNumber = document.getElementById("newPhoneNumber").value;
+
+        try {
+          const response = await fetch("/update-phone-number", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ newPhoneNumber })
+          });
+
+          if (response.ok) {
+            document.getElementById("update-phone-status").textContent =
+              "Phone number updated successfully.";
+            document.getElementById("update-phone-status").className = "success-message";
+            document.getElementById("currentPhoneNumber").value = newPhoneNumber;
+          } else {
+            const error = await response.text();
+            document.getElementById("update-phone-status").textContent = `Error: ${error}`;
+            document.getElementById("update-phone-status").className = "error-message";
+          }
+        } catch (err) {
+          document.getElementById("update-phone-status").textContent =
+            "Failed to update phone number.";
+          document.getElementById("update-phone-status").className = "error-message";
+        }
+      }
+
+      function logout() {
+        fetch("/logout", { method: "POST" }).then(() => {
+          window.location.href = "/";
+        });
+      }
+
+      document.getElementById("update-email-form").addEventListener("submit", updateEmail);
+      document.getElementById("update-address-form").addEventListener("submit", updateAddress);
+      document.getElementById("update-phone-form").addEventListener("submit", updatePhoneNumber);
+
+      fetchPatientData();
+    </script>
+  </body>
+</html>

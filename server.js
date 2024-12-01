@@ -2,18 +2,19 @@ const express = require("express");
 const mysql = require("mysql2");
 const path = require("path");
 const crypto = require("crypto");
+const session = require("express-session");
 
 const app = express();
 const port = 3000;
-
-const session = require("express-session");
 
 // Middleware to parse request body
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files (like HTML and CSS)
 app.use(express.static(path.join(__dirname, "public")));
 
+// Configure session
 app.use(
   session({
     secret: "your_secret_key", // Replace with a secure key for production
@@ -27,14 +28,11 @@ app.use(
   })
 );
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
+// Database configuration
 const dbConfig = {
   host: "localhost",
   user: "root",
-  password: "password",
+  password: "Mtl-12345",
   database: "Emergency_Department"
 };
 
@@ -49,22 +47,12 @@ db.connect(err => {
   }
 });
 
-app.get("/patients", (req, res) => {
-  if (!req.session || !req.session.userId) {
-    return res.status(401).send("Unauthorized: Please log in first.");
-  }
-
-  const query = "SELECT * FROM Patients";
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error("Error executing query:", err.message);
-      res.status(500).json({ error: "Database query error" });
-    } else {
-      res.json(results);
-    }
-  });
+// Routes
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// Login route
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
 
@@ -85,6 +73,7 @@ app.post("/login", (req, res) => {
 
     const user = results[0];
 
+    // Hash the entered password and compare with the stored hash
     const hashedPassword = crypto
       .createHash("sha256")
       .update(password)
@@ -92,18 +81,122 @@ app.post("/login", (req, res) => {
 
     if (hashedPassword === user.password_hash) {
       // Initialize session
-      req.session.userId = user.username; // Use `username` if no `userId` field
+      req.session.userId = user.username;
       req.session.role = user.role;
       req.session.associatedId = user.associated_id;
 
       console.log(`User ${username} logged in as ${user.role}.`);
-      return res.redirect("/patients");
+
+      // Redirect based on role
+      if (user.role === "patient") {
+        return res.redirect("/patient_dashboard.html");
+      } else {
+        return res.redirect("/provider_dashboard.html");
+      }
     } else {
       return res.status(401).send("Invalid username or password.");
     }
   });
 });
 
+// Patient data route (uses view in the database)
+app.get("/patient-data", (req, res) => {
+  if (!req.session || req.session.role !== "patient") {
+    return res.status(401).send("Unauthorized: Access is restricted to patients.");
+  }
+
+  const patientId = req.session.associatedId;
+
+  const query = `
+    SELECT 
+      first_name, 
+      last_name, 
+      date_of_birth, 
+      sex, 
+      address, 
+      email,
+      phone_number, 
+      medication_name, 
+      dosage, 
+      visit_time, 
+      reason_for_visit 
+    FROM PatientDetails
+    WHERE patient_id = ?;
+  `;
+
+  db.query(query, [patientId], (err, results) => {
+    if (err) {
+      console.error("Error executing query:", err.message);
+      return res.status(500).json({ error: "Database query error" });
+    }
+    res.json(results);
+  });
+});
+app.post("/update-email", (req, res) => {
+  if (!req.session || req.session.role !== "patient") {
+    return res.status(401).send("Unauthorized: Access is restricted to patients.");
+  }
+
+  const { newEmail } = req.body;
+  const patientId = req.session.associatedId;
+
+  if (!newEmail || !/\S+@\S+\.\S+/.test(newEmail)) {
+    return res.status(400).send("Invalid email address.");
+  }
+
+  const query = "CALL UpdatePatientEmail(?, ?)";
+  db.query(query, [patientId, newEmail], (err) => {
+    if (err) {
+      console.error("Error executing procedure:", err.message);
+      return res.status(500).send("Failed to update email.");
+    }
+    res.send("Email updated successfully.");
+  });
+});
+app.post("/update-address", (req, res) => {
+  if (!req.session || req.session.role !== "patient") {
+    return res.status(401).send("Unauthorized: Access is restricted to patients.");
+  }
+
+  const { newAddress } = req.body;
+  const patientId = req.session.associatedId;
+
+  if (!newAddress || newAddress.trim().length === 0) {
+    return res.status(400).send("Invalid address.");
+  }
+
+  const query = "CALL UpdatePatientAddress(?, ?)";
+  db.query(query, [patientId, newAddress], (err) => {
+    if (err) {
+      console.error("Error executing procedure:", err.message);
+      return res.status(500).send("Failed to update address.");
+    }
+    res.send("Address updated successfully.");
+  });
+});
+app.post("/update-phone-number", (req, res) => {
+  if (!req.session || req.session.role !== "patient") {
+    return res.status(401).send("Unauthorized: Access is restricted to patients.");
+  }
+
+  const { newPhoneNumber } = req.body;
+  const patientId = req.session.associatedId;
+
+  if (!newPhoneNumber || !/^\+?\d{7,15}$/.test(newPhoneNumber)) {
+    return res.status(400).send("Invalid phone number.");
+  }
+
+  const query = "CALL UpdatePatientPhoneNumber(?, ?)";
+  db.query(query, [patientId, newPhoneNumber], (err) => {
+    if (err) {
+      console.error("Error executing procedure:", err.message);
+      return res.status(500).send("Failed to update phone number.");
+    }
+    res.send("Phone number updated successfully.");
+  });
+});
+
+// Logout route
 app.post("/logout", (req, res) => {
   req.session.destroy(err => {
     if (err) {
