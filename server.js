@@ -32,7 +32,7 @@ app.use(
 const dbConfig = {
   host: "localhost",
   user: "root",
-  password: "Mtl-12345",
+  password: "!!!!!CHANGETHISTOYOURPASSWORD!!!!!",
   database: "Emergency_Department"
 };
 
@@ -73,21 +73,21 @@ app.post("/login", (req, res) => {
 
     const user = results[0];
 
-    // Hash the entered password and compare with the stored hash
+    
     const hashedPassword = crypto
       .createHash("sha256")
       .update(password)
       .digest("hex");
 
     if (hashedPassword === user.password_hash) {
-      // Initialize session
+      
       req.session.userId = user.username;
       req.session.role = user.role;
       req.session.associatedId = user.associated_id;
 
       console.log(`User ${username} logged in as ${user.role}.`);
 
-      // Redirect based on role
+      
       if (user.role === "patient") {
         return res.redirect("/patient_dashboard.html");
       } else {
@@ -99,7 +99,6 @@ app.post("/login", (req, res) => {
   });
 });
 
-// Patient data route (uses view in the database)
 app.get("/patient-data", (req, res) => {
   if (!req.session || req.session.role !== "patient") {
     return res.status(401).send("Unauthorized: Access is restricted to patients.");
@@ -195,18 +194,74 @@ app.post("/update-phone-number", (req, res) => {
     res.send("Phone number updated successfully.");
   });
 });
+app.get("/provider-data", (req, res) => {
+  if (!req.session || req.session.role !== "provider") {
+    return res.status(401).send("Unauthorized: Access is restricted to providers.");
+  }
 
-// Logout route
+  const providerId = req.session.associatedId;
+
+  const query = `
+    SELECT 
+      first_name, 
+      last_name, 
+      specialty, 
+      phone_number, 
+      email, 
+      facility_id
+    FROM ProviderDetails
+    WHERE provider_id = ?;
+  `;
+
+  db.query(query, [providerId], (err, results) => {
+    if (err) {
+      console.error("Error executing query:", err.message);
+      return res.status(500).json({ error: "Database query error" });
+    }
+    res.json(results);
+  });
+});
+
+app.get("/provider-visits", (req, res) => {
+  if (!req.session || req.session.role !== "provider") {
+    return res.status(401).send("Unauthorized: Access is restricted to providers.");
+  }
+
+  const providerId = req.session.associatedId;
+
+  const query = `
+    SELECT 
+      visit_id, 
+      patient_id, 
+      visit_time, 
+      discharge_time, 
+      reason_for_visit, 
+      triage_level, 
+      facility_id, 
+      billing_id
+    FROM ProviderVisits
+    WHERE provider_id = ?;
+  `;
+
+  db.query(query, [providerId], (err, results) => {
+    if (err) {
+      console.error("Error executing query:", err.message);
+      return res.status(500).json({ error: "Database query error" });
+    }
+    res.json(results);
+  });
+});
+
+
 app.post("/logout", (req, res) => {
   req.session.destroy(err => {
     if (err) {
       return res.status(500).send("Failed to log out");
     }
-    res.redirect("/"); // Redirect to the login page
+    res.redirect("/");
   });
 });
 
-// Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });

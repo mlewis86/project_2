@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Provider Dashboard</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      th, td {
+        padding: 10px;
+        border: 1px solid #ddd;
+      }
+      th {
+        background-color: #f4f4f4;
+      }
+      .form-group {
+        margin-bottom: 1em;
+      }
+      button {
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Welcome, Provider</h1>
+    <h2>Your Details</h2>
+    <div id="provider-details"></div>
+
+    <h2>Your Visits</h2>
+    <table id="visit-data">
+      <thead>
+        <tr>
+          <th>Visit ID</th>
+          <th>Patient ID</th>
+          <th>Visit Time</th>
+          <th>Discharge Time</th>
+          <th>Reason for Visit</th>
+          <th>Triage Level</th>
+          <th>Facility ID</th>
+          <th>Billing ID</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <button onclick="logout()">Logout</button>
+
+    <script>
+      async function fetchProviderData() {
+        const response = await fetch("/provider-data");
+        if (response.ok) {
+          const data = await response.json();
+          displayProviderData(data);
+          fetchProviderVisits(); 
+        } else {
+          document.body.innerHTML = "<h1>Unable to fetch data. Please log in again.</h1>";
+        }
+      }
+
+      function displayProviderData(data) {
+        if (data.length > 0) {
+          const details = `
+            <p><strong>Name:</strong> ${data[0].first_name} ${data[0].last_name}</p>
+            <p><strong>Specialty:</strong> ${data[0].specialty}</p>
+            <p><strong>Email:</strong> ${data[0].email}</p>
+            <p><strong>Phone Number:</strong> ${data[0].phone_number}</p>
+            <p><strong>Facility ID:</strong> ${data[0].facility_id}</p>
+          `;
+          document.getElementById("provider-details").innerHTML = details;
+        } else {
+          document.getElementById("provider-details").innerHTML = "<p>No details available.</p>";
+        }
+      }
+
+      async function fetchProviderVisits() {
+        const response = await fetch("/provider-visits");
+        if (response.ok) {
+          const data = await response.json();
+          displayProviderVisits(data);
+        } else {
+          document.getElementById("visit-data").querySelector("tbody").innerHTML =
+            "<tr><td colspan='8'>Unable to fetch data.</td></tr>";
+        }
+      }
+
+      function displayProviderVisits(data) {
+        const tbody = document.getElementById("visit-data").querySelector("tbody");
+        tbody.innerHTML = ""; 
+
+        if (data.length > 0) {
+          data.forEach(row => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${row.visit_id}</td>
+              <td>${row.patient_id}</td>
+              <td>${row.visit_time}</td>
+              <td>${row.discharge_time}</td>
+              <td>${row.reason_for_visit}</td>
+              <td>${row.triage_level}</td>
+              <td>${row.facility_id}</td>
+              <td>${row.billing_id}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = "<tr><td colspan='8'>No visits available.</td></tr>";
+        }
+      }
+
+      function logout() {
+        fetch("/logout", { method: "POST" }).then(() => {
+          window.location.href = "/";
+        });
+      }
+
+      fetchProviderData();
+    </script>
+  </body>
+</html>
