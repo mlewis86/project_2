@@ -88,6 +88,110 @@ app.post("/login", (req, res) => {
   });
 });
 
+app.get("/patient-data", (req, res) => {
+  if (!req.session || req.session.role !== "patient") {
+    return res
+      .status(401)
+      .send("Unauthorized: Access is restricted to patients.");
+  }
+
+  const patientId = req.session.associatedId;
+
+  const query = `
+    SELECT 
+      first_name, 
+      last_name, 
+      date_of_birth, 
+      sex, 
+      address, 
+      email,
+      phone_number, 
+      medication_name, 
+      dosage, 
+      visit_time, 
+      reason_for_visit 
+    FROM PatientDetails
+    WHERE patient_id = ?;
+  `;
+
+  db.query(query, [patientId], (err, results) => {
+    if (err) {
+      console.error("Error executing query:", err.message);
+      return res.status(500).json({ error: "Database query error" });
+    }
+    res.json(results);
+  });
+});
+app.post("/update-email", (req, res) => {
+  if (!req.session || req.session.role !== "patient") {
+    return res
+      .status(401)
+      .send("Unauthorized: Access is restricted to patients.");
+  }
+
+  const { newEmail } = req.body;
+  const patientId = req.session.associatedId;
+
+  if (!newEmail || !/\S+@\S+\.\S+/.test(newEmail)) {
+    return res.status(400).send("Invalid email address.");
+  }
+
+  const query = "CALL UpdatePatientEmail(?, ?)";
+  db.query(query, [patientId, newEmail], err => {
+    if (err) {
+      console.error("Error executing procedure:", err.message);
+      return res.status(500).send("Failed to update email.");
+    }
+    res.send("Email updated successfully.");
+  });
+});
+app.post("/update-address", (req, res) => {
+  if (!req.session || req.session.role !== "patient") {
+    return res
+      .status(401)
+      .send("Unauthorized: Access is restricted to patients.");
+  }
+
+  const { newAddress } = req.body;
+  const patientId = req.session.associatedId;
+
+  if (!newAddress || newAddress.trim().length === 0) {
+    return res.status(400).send("Invalid address.");
+  }
+
+  const query = "CALL UpdatePatientAddress(?, ?)";
+  db.query(query, [patientId, newAddress], err => {
+    if (err) {
+      console.error("Error executing procedure:", err.message);
+      return res.status(500).send("Failed to update address.");
+    }
+    res.send("Address updated successfully.");
+  });
+});
+app.post("/update-phone-number", (req, res) => {
+  if (!req.session || req.session.role !== "patient") {
+    return res
+      .status(401)
+      .send("Unauthorized: Access is restricted to patients.");
+  }
+
+  const { newPhoneNumber } = req.body;
+  const patientId = req.session.associatedId;
+
+  if (!newPhoneNumber || !/^\+?\d{7,15}$/.test(newPhoneNumber)) {
+    return res.status(400).send("Invalid phone number.");
+  }
+
+  const query = "CALL UpdatePatientPhoneNumber(?, ?)";
+  db.query(query, [patientId, newPhoneNumber], err => {
+    if (err) {
+      console.error("Error executing procedure:", err.message);
+      return res.status(500).send("Failed to update phone number.");
+    }
+    res.send("Phone number updated successfully.");
+  });
+});
+
 // Fetch provider data
 app.get("/provider-data", (req, res) => {
   if (!req.session || req.session.role !== "provider") {
@@ -130,125 +234,131 @@ app.get("/provider-visits", (req, res) => {
 
 // Fetch prescriptions for a patient
 app.get("/prescriptions", (req, res) => {
+  if (!req.session || req.session.role !== "provider") {
+    return res
+      .status(401)
+      .send("Unauthorized: Access is restricted to providers.");
+  }
+
   const patientId = req.query.patient_id;
   const providerId = req.session.associatedId;
 
-  const query = `
-    SELECT Prescriptions.prescription_id, Prescriptions.medication_name, Prescriptions.dosage,
-           Providers.first_name AS provider_first_name, Providers.last_name AS provider_last_name,
-           Visits.visit_time, Visits.reason_for_visit
-    FROM Prescriptions
-    JOIN Visits ON Prescriptions.visit_id = Visits.visit_id
-    JOIN Providers ON Prescriptions.provider_id = Providers.provider_id
-    WHERE Visits.patient_id = ? AND Providers.provider_id = ?;
-  `;
+  if (!patientId) {
+    return res.status(400).send("Patient ID is required.");
+  }
+
+  const query = "CALL GetPrescriptionsByPatientAndProvider(?, ?)";
+
   db.query(query, [patientId, providerId], (err, results) => {
     if (err) {
       console.error("Error fetching prescriptions:", err.message);
       return res.status(500).json({ error: "Database error." });
     }
-    res.json(results);
+
+    // Stored procedures return results in an array, first index contains the result set
+    res.json(results[0]);
   });
 });
 
 // Add a new prescription
 app.post("/prescriptions", (req, res) => {
+  if (!req.session || req.session.role !== "provider") {
+    return res
+      .status(401)
+      .send("Unauthorized: Access is restricted to providers.");
+  }
+
   const { visit_id, medication_name, dosage } = req.body;
   const providerId = req.session.associatedId;
 
-  const query = `
-    SELECT * FROM Visits WHERE visit_id = ? AND provider_id = ?;
-  `;
-  db.query(query, [visit_id, providerId], (err, results) => {
-    if (err) {
-      console.error("Error verifying visit:", err.message);
-      return res.status(500).send("Database error.");
-    }
+  if (!visit_id || !medication_name || !dosage) {
+    return res
+      .status(400)
+      .send("Visit ID, medication name, and dosage are required.");
+  }
 
-    if (results.length === 0) {
-      return res
-        .status(403)
-        .send("Unauthorized to add prescription for this visit.");
-    }
+  const query = "CALL AddPrescription(?, ?, ?, ?)";
 
-    const insertQuery = `
-      INSERT INTO Prescriptions (visit_id, provider_id, medication_name, dosage)
-      VALUES (?, ?, ?, ?);
-    `;
-    db.query(
-      insertQuery,
-      [visit_id, providerId, medication_name, dosage],
-      err => {
-        if (err) {
-          console.error("Error adding prescription:", err.message);
-          return res.status(500).send("Failed to add prescription.");
+  db.query(
+    query,
+    [visit_id, providerId, medication_name, dosage],
+    (err, results) => {
+      if (err) {
+        console.error("Error adding prescription:", err.message);
+        if (err.code === "ER_SIGNAL_EXCEPTION") {
+          return res.status(403).send(err.sqlMessage);
         }
-        res.send("Prescription added successfully.");
+        return res.status(500).send("Failed to add prescription.");
       }
-    );
-  });
+      res.send("Prescription added successfully.");
+    }
+  );
 });
 
 // Update prescription
 app.put("/prescriptions/:id", (req, res) => {
+  if (!req.session || req.session.role !== "provider") {
+    return res
+      .status(401)
+      .send("Unauthorized: Access is restricted to providers.");
+  }
+
   const prescriptionId = req.params.id;
   const { medication_name, dosage } = req.body;
   const providerId = req.session.associatedId;
 
-  const query = `
-    SELECT * FROM Prescriptions WHERE prescription_id = ? AND provider_id = ?;
-  `;
-  db.query(query, [prescriptionId, providerId], (err, results) => {
-    if (err) {
-      console.error("Error verifying prescription:", err.message);
-      return res.status(500).send("Database error.");
-    }
+  if (!medication_name || !dosage) {
+    return res.status(400).send("Medication name and dosage are required.");
+  }
 
-    if (results.length === 0) {
-      return res.status(403).send("Unauthorized to update this prescription.");
-    }
+  const query = "CALL UpdatePrescription(?, ?, ?, ?)";
 
-    const updateQuery = `
-      UPDATE Prescriptions SET medication_name = ?, dosage = ? WHERE prescription_id = ?;
-    `;
-    db.query(updateQuery, [medication_name, dosage, prescriptionId], err => {
+  db.query(
+    query,
+    [prescriptionId, providerId, medication_name, dosage],
+    (err, results) => {
       if (err) {
         console.error("Error updating prescription:", err.message);
+
+        // Handle custom error from SIGNAL
+        if (err.code === "ER_SIGNAL_EXCEPTION") {
+          return res.status(403).send(err.sqlMessage);
+        }
+
         return res.status(500).send("Failed to update prescription.");
       }
+
       res.send("Prescription updated successfully.");
-    });
-  });
+    }
+  );
 });
 
 // Delete prescription
 app.delete("/prescriptions/:id", (req, res) => {
+  if (!req.session || req.session.role !== "provider") {
+    return res
+      .status(401)
+      .send("Unauthorized: Access is restricted to providers.");
+  }
+
   const prescriptionId = req.params.id;
   const providerId = req.session.associatedId;
 
-  const query = `
-    SELECT * FROM Prescriptions WHERE prescription_id = ? AND provider_id = ?;
-  `;
-  db.query(query, [prescriptionId, providerId], (err, results) => {
+  const query = "CALL DeletePrescription(?, ?)";
+
+  db.query(query, [prescriptionId, providerId], err => {
     if (err) {
-      console.error("Error verifying prescription:", err.message);
-      return res.status(500).send("Database error.");
-    }
+      console.error("Error deleting prescription:", err.message);
 
-    if (results.length === 0) {
-      return res.status(403).send("Unauthorized to delete this prescription.");
-    }
-
-    const deleteQuery = `
-      DELETE FROM Prescriptions WHERE prescription_id = ?;
-    `;
-    db.query(deleteQuery, [prescriptionId], err => {
-      if (err) {
-        console.error("Error deleting prescription:", err.message);
-        return res.status(500).send("Failed to delete prescription.");
+      // Handle custom error from SIGNAL
+      if (err.code === "ER_SIGNAL_EXCEPTION") {
+        return res.status(403).send(err.sqlMessage);
       }
-      res.send("Prescription deleted successfully.");
-    });
+
+      return res.status(500).send("Failed to delete prescription.");
+    }
+
+    res.send("Prescription deleted successfully.");
   });
 });
 
