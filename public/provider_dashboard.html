@@ -13,7 +13,8 @@
         border-collapse: collapse;
         margin-top: 20px;
       }
-      th, td {
+      th,
+      td {
         padding: 10px;
         border: 1px solid #ddd;
       }
@@ -50,17 +51,89 @@
       <tbody></tbody>
     </table>
 
+    <h1>Search Prescriptions by Patient ID</h1>
+    <form id="searchForm">
+      <div class="form-group">
+        <label for="patientId">Enter Patient ID:</label>
+        <input type="text" id="patientId" name="patientId" required />
+      </div>
+      <button type="submit">Search</button>
+    </form>
+
+    <h2>Prescriptions</h2>
+    <table id="prescriptionsTable">
+      <thead>
+        <tr>
+          <th>Prescription ID</th>
+          <th>Medication Name</th>
+          <th>Dosage</th>
+          <th>Provider Name</th>
+          <th>Visit Time</th>
+          <th>Reason for Visit</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Update Prescription</h2>
+    <form id="updatePrescriptionForm">
+      <label for="updatePrescriptionId">Prescription ID:</label>
+      <input
+        type="text"
+        id="updatePrescriptionId"
+        name="updatePrescriptionId"
+        required
+      />
+
+      <label for="updateMedicationName">Medication Name:</label>
+      <input
+        type="text"
+        id="updateMedicationName"
+        name="updateMedicationName"
+        required
+      />
+
+      <label for="updateDosage">Dosage:</label>
+      <input type="text" id="updateDosage" name="updateDosage" required />
+
+      <button type="submit">Update Prescription</button>
+    </form>
+
+    <h2>Add Prescription</h2>
+    <form id="addPrescriptionForm">
+      <label for="visitId">Visit ID:</label>
+      <input type="text" id="visitId" name="visitId" required />
+
+      <label for="medicationName">Medication Name:</label>
+      <input type="text" id="medicationName" name="medicationName" required />
+
+      <label for="dosage">Dosage:</label>
+      <input type="text" id="dosage" name="dosage" required />
+
+      <button type="submit">Add Prescription</button>
+    </form>
+
     <button onclick="logout()">Logout</button>
 
     <script>
+      let currentPatientId = null; // Keep track of the current patient ID
+      let currentProviderId = null; // Initialize to null
+
+      // Fetch provider details
       async function fetchProviderData() {
         const response = await fetch("/provider-data");
         if (response.ok) {
           const data = await response.json();
-          displayProviderData(data);
-          fetchProviderVisits(); 
+          if (data.length > 0) {
+            currentProviderId = data[0].provider_id; // Set the provider ID
+            displayProviderData(data);
+          } else {
+            document.getElementById("provider-details").innerHTML =
+              "<p>No details available.</p>";
+          }
         } else {
-          document.body.innerHTML = "<h1>Unable to fetch data. Please log in again.</h1>";
+          document.body.innerHTML =
+            "<h1>Unable to fetch data. Please log in again.</h1>";
         }
       }
 
@@ -75,7 +148,8 @@
           `;
           document.getElementById("provider-details").innerHTML = details;
         } else {
-          document.getElementById("provider-details").innerHTML = "<p>No details available.</p>";
+          document.getElementById("provider-details").innerHTML =
+            "<p>No details available.</p>";
         }
       }
 
@@ -85,14 +159,18 @@
           const data = await response.json();
           displayProviderVisits(data);
         } else {
-          document.getElementById("visit-data").querySelector("tbody").innerHTML =
+          document
+            .getElementById("visit-data")
+            .querySelector("tbody").innerHTML =
             "<tr><td colspan='8'>Unable to fetch data.</td></tr>";
         }
       }
 
       function displayProviderVisits(data) {
-        const tbody = document.getElementById("visit-data").querySelector("tbody");
-        tbody.innerHTML = ""; 
+        const tbody = document
+          .getElementById("visit-data")
+          .querySelector("tbody");
+        tbody.innerHTML = "";
 
         if (data.length > 0) {
           data.forEach(row => {
@@ -110,9 +188,214 @@
             tbody.appendChild(tr);
           });
         } else {
-          tbody.innerHTML = "<tr><td colspan='8'>No visits available.</td></tr>";
+          tbody.innerHTML =
+            "<tr><td colspan='8'>No visits available.</td></tr>";
         }
       }
+
+      async function fetchPrescriptions(patientId) {
+        try {
+          const response = await fetch(
+            `/prescriptions?patient_id=${patientId}`
+          );
+          if (response.ok) {
+            const prescriptions = await response.json();
+            displayPrescriptions(prescriptions);
+          } else {
+            const error = await response.json();
+            alert(error.error || "Failed to fetch prescriptions.");
+          }
+        } catch (err) {
+          console.error("Error fetching prescriptions:", err);
+          alert("An error occurred. Please try again.");
+        }
+      }
+
+      function displayPrescriptions(prescriptions) {
+        const tableBody = document.querySelector("#prescriptionsTable tbody");
+        tableBody.innerHTML = ""; // Clear previous results
+
+        if (prescriptions.length > 0) {
+          prescriptions.forEach(prescription => {
+            const isAuthorized = prescription.provider_id === currentProviderId;
+
+            const row = document.createElement("tr");
+            row.innerHTML = `
+        <td>${prescription.prescription_id}</td>
+        <td>${prescription.medication_name}</td>
+        <td>${prescription.dosage}</td>
+        <td>${prescription.provider_first_name} ${
+              prescription.provider_last_name
+            }</td>
+        <td>${new Date(prescription.visit_time).toLocaleString()}</td>
+        <td>${prescription.reason_for_visit}</td>
+        <td>
+          <button 
+            onclick="populateUpdateForm(${prescription.prescription_id}, '${
+              prescription.medication_name
+            }', '${prescription.dosage}')"
+            ${!isAuthorized ? "disabled" : ""}
+          >
+            Update
+          </button>
+          <button 
+            onclick="deletePrescription(${prescription.prescription_id})"
+            ${!isAuthorized ? "disabled" : ""}
+          >
+            Delete
+          </button>
+        </td>
+      `;
+            tableBody.appendChild(row);
+          });
+        } else {
+          const row = document.createElement("tr");
+          row.innerHTML = `<td colspan="7">No prescriptions found.</td>`;
+          tableBody.appendChild(row);
+        }
+      }
+
+      // Populate update form with prescription details
+      function populateUpdateForm(prescriptionId, medicationName, dosage) {
+        document.getElementById("updatePrescriptionId").value = prescriptionId;
+        document.getElementById("updateMedicationName").value = medicationName;
+        document.getElementById("updateDosage").value = dosage;
+      }
+
+      // Update prescription function
+      async function updatePrescription(
+        prescriptionId,
+        medicationName,
+        dosage
+      ) {
+        try {
+          const response = await fetch(`/prescriptions/${prescriptionId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              medication_name: medicationName,
+              dosage: dosage
+            })
+          });
+
+          if (response.ok) {
+            alert("Prescription updated successfully.");
+            if (currentPatientId) {
+              fetchPrescriptions(currentPatientId); // Refresh the table
+            }
+          } else {
+            const error = await response.json();
+            alert(error.error || "Failed to update prescription.");
+          }
+        } catch (err) {
+          console.error("Error updating prescription:", err);
+          alert("An error occurred. Please try again.");
+        }
+      }
+
+      async function deletePrescription(prescriptionId) {
+        if (!confirm("Are you sure you want to delete this prescription?")) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`/prescriptions/${prescriptionId}`, {
+            method: "DELETE"
+          });
+
+          if (response.ok) {
+            alert("Prescription deleted successfully.");
+            const patientId = document.getElementById("patientId").value.trim();
+            if (patientId) {
+              fetchPrescriptions(patientId); // Refresh the table
+            }
+          } else {
+            const error = await response.json();
+            alert(error.error || "Failed to delete prescription.");
+          }
+        } catch (err) {
+          console.error("Error deleting prescription:", err);
+          alert("An error occurred. Please try again.");
+        }
+      }
+
+      // Event listener for search form submission
+      document
+        .getElementById("searchForm")
+        .addEventListener("submit", event => {
+          event.preventDefault();
+          currentPatientId = document.getElementById("patientId").value.trim();
+          if (currentPatientId) {
+            fetchPrescriptions(currentPatientId);
+          } else {
+            alert("Please enter a valid Patient ID.");
+          }
+        });
+
+      // Event listener for update form submission
+      document
+        .getElementById("updatePrescriptionForm")
+        .addEventListener("submit", event => {
+          event.preventDefault();
+
+          const prescriptionId = document.getElementById(
+            "updatePrescriptionId"
+          ).value;
+          const medicationName = document.getElementById(
+            "updateMedicationName"
+          ).value;
+          const dosage = document.getElementById("updateDosage").value;
+
+          updatePrescription(prescriptionId, medicationName, dosage);
+        });
+
+      async function addPrescription(visitId, medicationName, dosage) {
+        try {
+          const response = await fetch("/prescriptions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              visit_id: visitId,
+              medication_name: medicationName,
+              dosage: dosage
+            })
+          });
+
+          if (response.ok) {
+            alert("Prescription added successfully.");
+            // Optionally refresh the prescriptions list
+            const patientId = document.getElementById("patientId").value.trim();
+            if (patientId) {
+              fetchPrescriptions(patientId);
+            }
+          } else {
+            const error = await response.json();
+            alert(error.error || "Failed to add prescription.");
+          }
+        } catch (err) {
+          console.error("Error adding prescription:", err);
+          alert("An error occurred. Please try again.");
+        }
+      }
+
+      // Event listener for add prescription form
+      document
+        .getElementById("addPrescriptionForm")
+        .addEventListener("submit", event => {
+          event.preventDefault();
+
+          const visitId = document.getElementById("visitId").value.trim();
+          const medicationName = document
+            .getElementById("medicationName")
+            .value.trim();
+          const dosage = document.getElementById("dosage").value.trim();
+
+          if (visitId && medicationName && dosage) {
+            addPrescription(visitId, medicationName, dosage);
+          } else {
+            alert("All fields are required.");
+          }
+        });
 
       function logout() {
         fetch("/logout", { method: "POST" }).then(() => {
@@ -120,7 +403,9 @@
         });
       }
 
+      // Initialize
       fetchProviderData();
+      fetchProviderVisits();
     </script>
   </body>
 </html>
