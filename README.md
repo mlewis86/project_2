@@ -42,7 +42,7 @@ You need a MySQL user with permissions to create databases, tables, procedures, 
    mysql -u root -p
 
 once login 
-   ```sql 
+   sql 
       CREATE DATABASE Emergency_Department;
       USE Emergency_Department;
 
@@ -58,7 +58,7 @@ SOURCE /path/to/project2TestData.sql;
  * Insert sample data including patients, providers, and visits.
 
 3. **Verify**
- ```sql 
+ sql 
     SHOW TABLES;
     PROCEDURE STATUS WHERE Db='Emergency_Department'; ```
 
@@ -66,14 +66,14 @@ SOURCE /path/to/project2TestData.sql;
 
 In server.js, ensure the database credentials match your MySQL setup:
 
-  ```javascript
+  javascript
 
   const dbConfig = {
     host: "localhost",
     user: "root",
     password: "your_password_here",
     database: "Emergency_Department"
-  }; ```
+  }; 
 
 If you change credentials or database names, update these accordingly.
 
@@ -103,8 +103,7 @@ http://localhost:3000
 - View prescriptions.
 * Provider Dashboard (provider_dashboard.html):
 - View visits associated with the provider.
-- Add, update, or delete prescriptions for 
-patients under care.
+- Add, update, or delete prescriptions for patients under care.
 
 All updates and database accesses are logged in the AuditTrail table.
 
