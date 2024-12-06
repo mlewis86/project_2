@@ -42,7 +42,7 @@ You need a MySQL user with permissions to create databases, tables, procedures, 
    mysql -u root -p
 
 once login 
-   sql 
+   * sql 
    ```bash
       CREATE DATABASE Emergency_Department;
       USE Emergency_Department;
@@ -59,7 +59,7 @@ SOURCE /path/to/project2TestData.sql;
  * Insert sample data including patients, providers, and visits.
 
 3. **Verify**
-sql 
+* sql 
   ```bash 
     SHOW TABLES;
     PROCEDURE STATUS WHERE Db='Emergency_Department'; ```
@@ -68,7 +68,7 @@ sql
 
 In server.js, ensure the database credentials match your MySQL setup:
 
-  javascript
+  * javascript
 ```bash
   const dbConfig = {
     host: "localhost",
@@ -77,7 +77,7 @@ In server.js, ensure the database credentials match your MySQL setup:
     database: "Emergency_Department"
   }; 
 
-If you change credentials or database names, update these accordingly.
+*If you change credentials or database names, update these accordingly.
 
 ## Installing and Running ##
 
@@ -85,12 +85,12 @@ If you change credentials or database names, update these accordingly.
    ```bash
    cd project_2
    npm install
-   `
-2. Start the Server:
+
+2. **Start the Server:**
    ```bash 
    node server.js
-   `
- The server typically runs on http://localhost:3000. Adjust the port in server.js if necessary.
+
+* The server typically runs on http://localhost:3000. Adjust the port in server.js if necessary.
 
 3. Access the Application:
 * Open your browser and visit:
