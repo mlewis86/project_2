@@ -47,15 +47,16 @@ once login
       USE Emergency_Department;
 
 2. **Import SQL Files in Order:**
+ ```bash 
+   SOURCE /path/to/project2Tables.sql;
 
-SOURCE /path/to/project2Tables.sql;
-SOURCE /path/to/project2Views.sql;
-SOURCE /path/to/project2Procedures.sql;
-SOURCE /path/to/project2TestData.sql;
- 
-this will  
- * Create all tables, views, and stored procedures.
- * Insert sample data including patients, providers, and visits.
+   SOURCE /path/to/project2Views.sql;
+
+   SOURCE /path/to/project2Procedures.sql;
+
+   SOURCE /path/to/project2TestData.sql;
+   
+** this will** Create all tables, views, and stored procedures. and Insert sample data including patients, providers, and visits.
 
 3. **Verify**
   ```bash 
