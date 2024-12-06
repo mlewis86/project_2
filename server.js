@@ -68,12 +68,14 @@ app.post("/login", (req, res) => {
     }
 
     const user = results[0];
+    // console.log(results[0]);
     const hashedPassword = crypto
       .createHash("sha256")
       .update(password)
       .digest("hex");
 
     if (hashedPassword === user.password_hash) {
+      req.session.actualUserId = user.user_id;
       req.session.userId = user.username;
       req.session.role = user.role;
       req.session.associatedId = user.associated_id;
@@ -96,6 +98,7 @@ app.get("/patient-data", (req, res) => {
   }
 
   const patientId = req.session.associatedId;
+  const userId = req.session.actualUserId; // Assuming userId is stored in the session
 
   const query = `
     SELECT 
@@ -119,9 +122,34 @@ app.get("/patient-data", (req, res) => {
       console.error("Error executing query:", err.message);
       return res.status(500).json({ error: "Database query error" });
     }
-    res.json(results);
+
+    // Log the access to the AuditTrail table
+    const auditQuery = `
+      INSERT INTO AuditTrail (table_name, operation_type, old_value, new_value, user_id)
+      VALUES (?, ?, ?, ?, ?);
+    `;
+    const auditValues = [
+      "PatientDetails", // Table/view name
+      "SELECT", // Operation type
+      `Patient ID: ${patientId}`, // Old value (context)
+      null, // No new value for SELECT
+      userId // The user accessing the data
+    ];
+
+    db.query(auditQuery, auditValues, auditErr => {
+      if (auditErr) {
+        console.error("Error logging access to AuditTrail:", auditErr.message);
+        return res
+          .status(500)
+          .json({ error: "Failed to log access in audit trail" });
+      }
+
+      // Return the patient data
+      res.json(results);
+    });
   });
 });
+
 app.post("/update-email", (req, res) => {
   if (!req.session || req.session.role !== "patient") {
     return res
@@ -131,13 +159,14 @@ app.post("/update-email", (req, res) => {
 
   const { newEmail } = req.body;
   const patientId = req.session.associatedId;
+  const userId = req.session.actualUserId;
 
   if (!newEmail || !/\S+@\S+\.\S+/.test(newEmail)) {
     return res.status(400).send("Invalid email address.");
   }
 
-  const query = "CALL UpdatePatientEmail(?, ?)";
-  db.query(query, [patientId, newEmail], err => {
+  const query = "CALL UpdatePatientEmail(?, ?, ?)";
+  db.query(query, [patientId, newEmail, userId], err => {
     if (err) {
       console.error("Error executing procedure:", err.message);
       return res.status(500).send("Failed to update email.");
@@ -154,13 +183,14 @@ app.post("/update-address", (req, res) => {
 
   const { newAddress } = req.body;
   const patientId = req.session.associatedId;
+  const userId = req.session.actualUserId;
 
   if (!newAddress || newAddress.trim().length === 0) {
     return res.status(400).send("Invalid address.");
   }
 
-  const query = "CALL UpdatePatientAddress(?, ?)";
-  db.query(query, [patientId, newAddress], err => {
+  const query = "CALL UpdatePatientAddress(?, ?, ?)";
+  db.query(query, [patientId, newAddress, userId], err => {
     if (err) {
       console.error("Error executing procedure:", err.message);
       return res.status(500).send("Failed to update address.");
@@ -177,13 +207,14 @@ app.post("/update-phone-number", (req, res) => {
 
   const { newPhoneNumber } = req.body;
   const patientId = req.session.associatedId;
+  const userId = req.session.actualUserId;
 
   if (!newPhoneNumber || !/^\+?\d{7,15}$/.test(newPhoneNumber)) {
     return res.status(400).send("Invalid phone number.");
   }
 
-  const query = "CALL UpdatePatientPhoneNumber(?, ?)";
-  db.query(query, [patientId, newPhoneNumber], err => {
+  const query = "CALL UpdatePatientPhoneNumber(?, ?, ?)";
+  db.query(query, [patientId, newPhoneNumber, userId], err => {
     if (err) {
       console.error("Error executing procedure:", err.message);
       return res.status(500).send("Failed to update phone number.");
@@ -199,36 +230,89 @@ app.get("/provider-data", (req, res) => {
   }
 
   const providerId = req.session.associatedId;
+  const userId = req.session.actualUserId; // Assuming userId is stored in the session
+
   const query = `
     SELECT first_name, last_name, specialty, phone_number, email, facility_id
     FROM Providers WHERE provider_id = ?;
   `;
+
   db.query(query, [providerId], (err, results) => {
     if (err) {
       console.error("Error fetching provider data:", err.message);
       return res.status(500).json({ error: "Database error." });
     }
-    res.json(results);
+
+    // Log the access to the AuditTrail table
+    const auditQuery = `
+      INSERT INTO AuditTrail (table_name, operation_type, old_value, new_value, user_id)
+      VALUES (?, ?, ?, ?, ?);
+    `;
+    const auditValues = [
+      "Providers", // Table name
+      "SELECT", // Operation type
+      `Provider ID: ${providerId}`, // Old value (context)
+      null, // No new value for SELECT
+      userId // The user accessing the data
+    ];
+
+    db.query(auditQuery, auditValues, auditErr => {
+      if (auditErr) {
+        console.error("Error logging access to AuditTrail:", auditErr.message);
+        return res
+          .status(500)
+          .json({ error: "Failed to log access in audit trail" });
+      }
+
+      // Return the provider data
+      res.json(results);
+    });
   });
 });
 
-// Fetch visits for provider
 app.get("/provider-visits", (req, res) => {
   if (!req.session || req.session.role !== "provider") {
     return res.status(401).send("Unauthorized.");
   }
 
   const providerId = req.session.associatedId;
+  const userId = req.session.actualUserId; // Assuming userId is stored in the session
+
   const query = `
     SELECT visit_id, patient_id, visit_time, discharge_time, reason_for_visit, triage_level, facility_id, billing_id
     FROM Visits WHERE provider_id = ?;
   `;
+
   db.query(query, [providerId], (err, results) => {
     if (err) {
       console.error("Error fetching visits:", err.message);
       return res.status(500).json({ error: "Database error." });
     }
-    res.json(results);
+
+    // Log the access to the AuditTrail table
+    const auditQuery = `
+      INSERT INTO AuditTrail (table_name, operation_type, old_value, new_value, user_id)
+      VALUES (?, ?, ?, ?, ?);
+    `;
+    const auditValues = [
+      "Visits", // Table name
+      "SELECT", // Operation type
+      `Provider ID: ${providerId}`, // Old value (context)
+      null, // No new value for SELECT
+      userId // The user accessing the data
+    ];
+
+    db.query(auditQuery, auditValues, auditErr => {
+      if (auditErr) {
+        console.error("Error logging access to AuditTrail:", auditErr.message);
+        return res
+          .status(500)
+          .json({ error: "Failed to log access in audit trail" });
+      }
+
+      // Return the visit data
+      res.json(results);
+    });
   });
 });
 
@@ -242,14 +326,15 @@ app.get("/prescriptions", (req, res) => {
 
   const patientId = req.query.patient_id;
   const providerId = req.session.associatedId;
+  const userId = req.session.actualUserId;
 
   if (!patientId) {
     return res.status(400).send("Patient ID is required.");
   }
 
-  const query = "CALL GetPrescriptionsByPatientAndProvider(?, ?)";
+  const query = "CALL GetPrescriptionsByPatientAndProvider(?, ?, ?)";
 
-  db.query(query, [patientId, providerId], (err, results) => {
+  db.query(query, [patientId, providerId, userId], (err, results) => {
     if (err) {
       console.error("Error fetching prescriptions:", err.message);
       return res.status(500).json({ error: "Database error." });
@@ -270,6 +355,7 @@ app.post("/prescriptions", (req, res) => {
 
   const { visit_id, medication_name, dosage } = req.body;
   const providerId = req.session.associatedId;
+  const userId = req.session.actualUserId;
 
   if (!visit_id || !medication_name || !dosage) {
     return res
@@ -277,11 +363,11 @@ app.post("/prescriptions", (req, res) => {
       .send("Visit ID, medication name, and dosage are required.");
   }
 
-  const query = "CALL AddPrescription(?, ?, ?, ?)";
+  const query = "CALL AddPrescription(?, ?, ?, ?, ?)";
 
   db.query(
     query,
-    [visit_id, providerId, medication_name, dosage],
+    [visit_id, providerId, medication_name, dosage, userId],
     (err, results) => {
       if (err) {
         console.error("Error adding prescription:", err.message);
@@ -306,16 +392,17 @@ app.put("/prescriptions/:id", (req, res) => {
   const prescriptionId = req.params.id;
   const { medication_name, dosage } = req.body;
   const providerId = req.session.associatedId;
+  const userId = req.session.actualUserId;
 
   if (!medication_name || !dosage) {
     return res.status(400).send("Medication name and dosage are required.");
   }
 
-  const query = "CALL UpdatePrescription(?, ?, ?, ?)";
+  const query = "CALL UpdatePrescription(?, ?, ?, ?, ?)";
 
   db.query(
     query,
-    [prescriptionId, providerId, medication_name, dosage],
+    [prescriptionId, providerId, medication_name, dosage, userId],
     (err, results) => {
       if (err) {
         console.error("Error updating prescription:", err.message);
@@ -343,10 +430,11 @@ app.delete("/prescriptions/:id", (req, res) => {
 
   const prescriptionId = req.params.id;
   const providerId = req.session.associatedId;
+  const userId = req.session.actualUserId;
 
-  const query = "CALL DeletePrescription(?, ?)";
+  const query = "CALL DeletePrescription(?, ?, ?)";
 
-  db.query(query, [prescriptionId, providerId], err => {
+  db.query(query, [prescriptionId, providerId, userId], err => {
     if (err) {
       console.error("Error deleting prescription:", err.message);
 

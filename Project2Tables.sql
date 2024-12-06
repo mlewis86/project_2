@@ -138,3 +138,14 @@ CREATE TABLE Users (
     CONSTRAINT fk_associated_patient FOREIGN KEY (associated_id) REFERENCES Patients(patient_id),
     CONSTRAINT fk_associated_provider FOREIGN KEY (associated_id) REFERENCES Providers(provider_id)
 );
+
+CREATE TABLE AuditTrail (
+    audit_id INT AUTO_INCREMENT PRIMARY KEY,
+    table_name VARCHAR(100) NOT NULL,
+    operation_type ENUM('INSERT', 'UPDATE', 'DELETE', 'SELECT') NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    operation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    user_id INT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id)
+);
