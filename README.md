@@ -42,8 +42,7 @@ You need a MySQL user with permissions to create databases, tables, procedures, 
    mysql -u root -p
 
 once login 
-   **sql**
-   ```bash
+   
       CREATE DATABASE Emergency_Department;
       USE Emergency_Department;
 
@@ -59,7 +58,6 @@ this will
  * Insert sample data including patients, providers, and visits.
 
 3. **Verify**
-**sql**
   ```bash 
     SHOW TABLES;
     PROCEDURE STATUS WHERE Db='Emergency_Department'; ```
@@ -68,7 +66,7 @@ this will
 
 In server.js, ensure the database credentials match your MySQL setup:
 
-  **javascript**
+1. **javascript**
     ```bash
   const dbConfig = {
     host: "localhost",
