@@ -43,8 +43,9 @@ You need a MySQL user with permissions to create databases, tables, procedures, 
 
 once login 
    sql 
+   ```bash
       CREATE DATABASE Emergency_Department;
-      USE Emergency_Department; ```
+      USE Emergency_Department;
 
 2. **Import SQL Files in Order:**
 
@@ -58,7 +59,8 @@ SOURCE /path/to/project2TestData.sql;
  * Insert sample data including patients, providers, and visits.
 
 3. **Verify**
- sql 
+sql 
+  ```bash 
     SHOW TABLES;
     PROCEDURE STATUS WHERE Db='Emergency_Department'; ```
 
@@ -67,7 +69,7 @@ SOURCE /path/to/project2TestData.sql;
 In server.js, ensure the database credentials match your MySQL setup:
 
   javascript
-
+```bash
   const dbConfig = {
     host: "localhost",
     user: "root",
@@ -94,6 +96,7 @@ If you change credentials or database names, update these accordingly.
 * Open your browser and visit:
 http://localhost:3000
 * Use the provided test credentials (from project2TestData.sql) to log in as a patient or a provider.
+
 ## Usage
 
 * Login (index.html): Enter your username and password (check Users table from test data).
