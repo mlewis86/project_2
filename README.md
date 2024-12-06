@@ -44,7 +44,7 @@ You need a MySQL user with permissions to create databases, tables, procedures, 
 once login 
    ```sql 
       CREATE DATABASE Emergency_Department;
-      USE Emergency_Department;
+      USE Emergency_Department; ```
 
 2. **Import SQL Files in Order:**
 
